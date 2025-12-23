@@ -1,0 +1,1107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+ <meta charset="UTF-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1.0">
+ <title>Nivan's Monkey Collector</title>
+ <style>
+ body { margin: 0; overflow: hidden; background-color: #87CEEB; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+ canvas { display: block; }
+ #ui {
+ position: absolute;
+ top: 20px;
+ left: 20px;
+ color: white;
+ text-shadow: 2px 2px 0 #000;
+ pointer-events: none;
+ user-select: none;
+ z-index: 5;
+ }
+ #score { font-size: 32px; font-weight: bold; }
+ #controls { font-size: 16px; margin-top: 5px; }
+ 
+ #combo-ui {
+ position: absolute;
+ top: 80px;
+ left: 20px;
+ font-size: 48px;
+ font-weight: 900;
+ color: #FFD700;
+ text-shadow: 4px 4px 0 #FF4500;
+ transform: scale(0);
+ transition: transform 0.1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+ pointer-events: none;
+ z-index: 5;
+ }
+ 
+ #magnet-ui {
+ display: none;
+ position: absolute;
+ top: 140px;
+ left: 20px;
+ color: cyan;
+ font-size: 24px;
+ font-weight: bold;
+ text-shadow: 0 0 10px blue;
+ animation: flicker 0.5s infinite;
+ }
+
+ #interaction-prompt {
+ display: none;
+ position: absolute;
+ top: 50%;
+ right: 5%;
+ transform: translateY(-50%);
+ color: white;
+ font-size: 24px;
+ font-weight: bold;
+ text-shadow: 2px 2px 0 #000;
+ pointer-events: none;
+ z-index: 20;
+ animation: bounce 1s infinite;
+ }
+
+ @keyframes bounce {
+ 0%, 100% { transform: translateY(-50%); }
+ 50% { transform: translateY(-60%); }
+ }
+
+ @keyframes flicker {
+ 0% { opacity: 1; }
+ 50% { opacity: 0.5; }
+ 100% { opacity: 1; }
+ }
+ 
+ /* Shared Modal Styles */
+ .modal {
+ display: none;
+ position: absolute;
+ top: 50%;
+ left: 50%;
+ transform: translate(-50%, -50%);
+ padding: 40px;
+ border-radius: 20px;
+ text-align: center;
+ border: 4px solid;
+ z-index: 10;
+ }
+ .modal h1 { margin: 0 0 20px 0; font-size: 48px; }
+ .restart-btn {
+ color: white;
+ border: none;
+ padding: 15px 30px;
+ font-size: 24px;
+ border-radius: 10px;
+ cursor: pointer;
+ font-weight: bold;
+ pointer-events: auto;
+ margin-top: 20px;
+ }
+
+ /* Shop Screen */
+ #shop-screen {
+ background: rgba(50, 0, 80, 0.95);
+ color: #E0B0FF;
+ border-color: #800080;
+ width: 500px;
+ }
+ .shop-item {
+ background: rgba(0,0,0,0.3);
+ margin: 10px 0;
+ padding: 15px;
+ border-radius: 10px;
+ display: flex;
+ justify-content: space-between;
+ align-items: center;
+ }
+ .shop-btn { 
+ background: #800080; 
+ color: white;
+ border: none;
+ padding: 10px 20px;
+ border-radius: 5px;
+ cursor: pointer;
+ font-weight: bold;
+ pointer-events: auto;
+ }
+ .shop-btn:hover { background: #9932CC; }
+ .shop-btn:disabled { background: #555; cursor: not-allowed; opacity: 0.7; }
+
+ /* Dialogue Box */
+ #dialogue-box {
+ display: none;
+ position: absolute;
+ bottom: 20px;
+ left: 50%;
+ transform: translateX(-50%);
+ width: 80%;
+ max-width: 600px;
+ background: rgba(0, 0, 50, 0.9);
+ border: 4px solid #4169E1; /* Royal Blue */
+ border-radius: 15px;
+ padding: 20px;
+ color: white;
+ z-index: 30;
+ display: flex;
+ align-items: center;
+ gap: 20px;
+ pointer-events: auto; /* Enable clicks */
+ }
+ 
+ .dialogue-icon {
+ min-width: 80px;
+ height: 80px;
+ background: #0000FF;
+ border-radius: 50%;
+ border: 3px solid white;
+ display: flex;
+ justify-content: center;
+ align-items: center;
+ font-size: 40px;
+ }
+
+ .dialogue-content {
+ flex: 1;
+ text-align: left;
+ }
+
+ #dialogue-btn {
+ background: #4169E1;
+ color: white;
+ border: none;
+ padding: 10px 20px;
+ border-radius: 5px;
+ cursor: pointer;
+ font-weight: bold;
+ margin-top: 10px;
+ }
+ #dialogue-btn:hover { background: #1E90FF; }
+
+ /* Win/Lose Screen */
+ #win-screen {
+ background: rgba(0, 0, 0, 0.6);
+ color: yellow;
+ border-color: orange;
+ top: 30%;
+ }
+ #win-btn { background: orange; }
+ #win-btn:hover { background: darkorange; }
+
+ #lose-screen {
+ background: rgba(50, 0, 0, 0.9);
+ color: red;
+ border-color: darkred;
+ }
+ #lose-btn { background: darkred; }
+ #lose-btn:hover { background: red; }
+
+ #start-prompt {
+ position: absolute;
+ bottom: 20px;
+ width: 100%;
+ text-align: center;
+ color: white;
+ font-size: 20px;
+ font-weight: bold;
+ text-shadow: 1px 1px 2px black;
+ animation: pulse 1.5s infinite;
+ pointer-events: none;
+ }
+ @keyframes pulse { 0% { opacity: 0.5; } 50% { opacity: 1; } 100% { opacity: 0.5; } }
+
+ </style>
+</head>
+<body>
+
+ <div id="ui">
+ <div id="score">Bananas: 0 | Collected: 0/20</div>
+ <div id="controls">WASD: Move • SPACE: Jump • E: Attack • Q: Interact</div>
+ <div id="combo-ui">COMBO x1</div>
+ <div id="magnet-ui">MAGNET POWER ACTIVE!</div>
+ <div id="interaction-prompt">Press 'Q' to Talk</div>
+ </div>
+
+ <div id="start-prompt">Press any key to start Music & Game</div>
+
+ <!-- Dialogue Box -->
+ <div id="dialogue-box">
+ <div class="dialogue-icon">🐵</div>
+ <div class="dialogue-content">
+ <h3 style="margin: 0 0 5px 0; color: #4169E1;">Shopkeeper</h3>
+ <p style="margin: 0;">Hello Mr.Monkey, there have been a ton of bad monkeys in the forest - and I can help you win, I just need my well, money - money!</p>
+ <button id="dialogue-btn">Open Shop</button>
+ </div>
+ </div>
+
+ <!-- Shop Screen -->
+ <div id="shop-screen" class="modal">
+ <h1>BANANA SHOP</h1>
+ <p>Current Bananas: <span id="shop-currency" style="color:yellow; font-weight:bold;">0</span></p>
+ 
+ <div class="shop-item">
+ <div>
+ <h3>Speed Boost (+20%)</h3>
+ <p>Run faster!</p>
+ </div>
+ <button id="btn-speed" class="shop-btn">Buy (5 B)</button>
+ </div>
+
+ <div class="shop-item">
+ <div>
+ <h3>Jump Boost (+15%)</h3>
+ <p>Jump higher!</p>
+ </div>
+ <button id="btn-jump" class="shop-btn">Buy (8 B)</button>
+ </div>
+
+ <div class="shop-item">
+ <div>
+ <h3>Magnet Upgrade (+5s)</h3>
+ <p>Longer duration!</p>
+ </div>
+ <button id="btn-magnet" class="shop-btn">Buy (10 B)</button>
+ </div>
+
+ <div class="shop-item" style="border: 2px solid gold; background: rgba(255,215,0,0.1);">
+ <div>
+ <h3 style="color:gold">ULTIMATE POWER</h3>
+ <p style="font-size:12px">Cinematic Destruction</p>
+ </div>
+ <button id="btn-ultimate" class="shop-btn" style="background: gold; color: black;">Buy (13 B)</button>
+ </div>
+
+ <p style="margin-top: 20px; font-size: 16px;">Press 'Q' or ESC to Close</p>
+ </div>
+
+ <!-- Win Screen -->
+ <div id="win-screen" class="modal">
+ <h1>LEGENDARY!</h1>
+ <p>You found the Blue Gem!</p>
+ <button id="win-btn" class="restart-btn">Play Again</button>
+ </div>
+
+ <!-- Lose Screen -->
+ <div id="lose-screen" class="modal">
+ <h1>GAME OVER</h1>
+ <p>The bad monkeys caught you (or you fell)!</p>
+ <button id="lose-btn" class="restart-btn">Try Again</button>
+ </div>
+
+ <!-- Import Three.js -->
+ <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+ <script>
+ window.onload = function() {
+ init();
+ };
+
+ let scene, camera, renderer;
+ let monkeyGroup; 
+ let shopkeeperGroup; 
+ let bananas = [];
+ let enemies = [];
+ let magnets = []; 
+ let platforms = [];
+ let particles = []; 
+ let shockwaves = []; 
+ let blueGem = null;
+ let gemBeacon = null;
+ 
+ let currency = 0; 
+ let totalCollected = 0; 
+ const totalBananas = 20;
+ let playerSpeed = 0.2; 
+ let magnetDuration = 5000; 
+ 
+ let velocityY = 0;
+ let isGrounded = true;
+ const gravity = 0.015;
+ let jumpForce = 0.4;
+ 
+ let comboMultiplier = 1;
+ let comboTimer = null;
+ const COMBO_WINDOW = 2500; 
+ 
+ let isGameOver = false;
+ let isFalling = false;
+ let isMagnetActive = false;
+ let isShopOpen = false;
+ let isDialogueOpen = false;
+ let isFirstShopVisit = true;
+ let isUltimateActive = false; 
+ let isAttackOnCooldown = false;
+ let isGemCollected = false; 
+ let magnetTimeout;
+ let beaconTimeout;
+ let ultimateSequenceTimeout; 
+ let cinematicCameraTarget = null; 
+ 
+ const keys = { w: false, a: false, s: false, d: false, arrowup: false, arrowleft: false, arrowdown: false, arrowright: false, space: false, e: false, q: false };
+ let cameraAngle = 0;
+ let isDragging = false;
+ let previousMousePosition = { x: 0, y: 0 };
+ const cameraDistance = 15;
+ const cameraHeight = 8;
+
+ let audioCtx;
+ let voices = [];
+ let musicInterval;
+ let isMusicPlaying = false;
+
+ function init() {
+ scene = new THREE.Scene();
+ scene.background = new THREE.Color(0x87CEEB); 
+ scene.fog = new THREE.Fog(0x87CEEB, 10, 100); 
+
+ camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+ 
+ renderer = new THREE.WebGLRenderer({ antialias: true });
+ renderer.setSize(window.innerWidth, window.innerHeight);
+ renderer.shadowMap.enabled = true;
+ document.body.appendChild(renderer.domElement);
+
+ const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+ scene.add(ambientLight);
+
+ const dirLight = new THREE.DirectionalLight(0xffffff, 0.9);
+ dirLight.position.set(50, 100, 50);
+ dirLight.castShadow = true;
+ dirLight.shadow.camera.left = -100;
+ dirLight.shadow.camera.right = 100;
+ dirLight.shadow.camera.top = 100;
+ dirLight.shadow.camera.bottom = -100;
+ dirLight.shadow.mapSize.width = 2048;
+ dirLight.shadow.mapSize.height = 2048;
+ scene.add(dirLight);
+
+ createMap();
+ createPlatformerChallenge();
+ generateVegetation();
+
+ monkeyGroup = createCharacterMesh(0x8B4513); 
+ monkeyGroup.position.set(-40, 0, 0); 
+ scene.add(monkeyGroup);
+ 
+ shopkeeperGroup = createShopkeeper(-35, 8);
+
+ spawnBananas();
+ spawnEnemies();
+ spawnMagnets(); 
+
+ window.addEventListener('resize', onWindowResize, false);
+ 
+ document.addEventListener('keydown', (e) => {
+ const k = e.key.toLowerCase();
+ keys[k] = true;
+ if(e.code === 'Space') keys.space = true;
+ 
+ if (k === 'q' || (e.key === 'Escape' && (isShopOpen || isDialogueOpen))) {
+ handleInteraction();
+ }
+
+ if (!audioCtx) {
+ initAudio();
+ startTropicalMusic();
+ document.getElementById('start-prompt').style.display = 'none';
+ }
+
+ if (k === 'e' && !isGameOver && !isShopOpen && !isDialogueOpen && !isGemCollected) performAttack();
+ 
+ if (e.code === 'Space' && !isGameOver && !isShopOpen && !isDialogueOpen && isGrounded && !isUltimateActive && !isGemCollected) {
+ velocityY = jumpForce;
+ isGrounded = false;
+ if(monkeyGroup.userData.visual) monkeyGroup.userData.visual.position.y = 0;
+ playTone(200, 'square', 0.1, 0.1);
+ createParticles(monkeyGroup.position.x, monkeyGroup.position.y, monkeyGroup.position.z, 0xFFFFFF, 5); 
+ }
+ });
+ document.addEventListener('keyup', (e) => {
+ const k = e.key.toLowerCase();
+ keys[k] = false;
+ if(e.code === 'Space') keys.space = false;
+ });
+ 
+ document.addEventListener('mousedown', () => {
+ if(isShopOpen || isDialogueOpen) return; 
+ isDragging = true;
+ if (!audioCtx) {
+ initAudio();
+ startTropicalMusic();
+ document.getElementById('start-prompt').style.display = 'none';
+ }
+ });
+ document.addEventListener('mouseup', () => isDragging = false);
+ document.addEventListener('mousemove', (e) => {
+ if (isDragging) {
+ const deltaMove = { x: e.offsetX - previousMousePosition.x };
+ cameraAngle -= deltaMove.x * 0.01;
+ }
+ previousMousePosition = { x: e.offsetX, y: e.offsetY };
+ });
+
+ document.getElementById('win-btn').addEventListener('click', restartGame);
+ document.getElementById('lose-btn').addEventListener('click', restartGame);
+ document.getElementById('dialogue-btn').addEventListener('click', proceedToShop);
+ document.getElementById('btn-speed').addEventListener('click', () => buyUpgrade('speed', 5));
+ document.getElementById('btn-jump').addEventListener('click', () => buyUpgrade('jump', 8));
+ document.getElementById('btn-magnet').addEventListener('click', () => buyUpgrade('magnet', 10));
+ document.getElementById('btn-ultimate').addEventListener('click', () => buyUpgrade('ultimate', 13));
+
+ const loadVoices = () => { voices = window.speechSynthesis.getVoices(); };
+ window.speechSynthesis.onvoiceschanged = loadVoices;
+ loadVoices(); 
+
+ animate();
+ }
+
+ // --- MAP FUNCTIONS (Explicitly Defined) ---
+ function createMap() {
+ const grassMat = new THREE.MeshLambertMaterial({ color: 0x3da342 });
+ const waterMat = new THREE.MeshLambertMaterial({ color: 0x1E90FF, transparent: true, opacity: 0.8 });
+ const pathMat = new THREE.MeshLambertMaterial({ color: 0xD2B48C }); 
+ 
+ const leftGeo = new THREE.BoxGeometry(120, 10, 240);
+ const leftCliff = new THREE.Mesh(leftGeo, grassMat);
+ leftCliff.position.set(-80, -5, 0); 
+ leftCliff.receiveShadow = true;
+ scene.add(leftCliff);
+
+ const rightGeo = new THREE.BoxGeometry(120, 10, 240);
+ const rightCliff = new THREE.Mesh(rightGeo, grassMat);
+ rightCliff.position.set(80, -5, 0);
+ rightCliff.receiveShadow = true;
+ scene.add(rightCliff);
+
+ const leftPathGeo = new THREE.PlaneGeometry(80, 8); 
+ const leftPath = new THREE.Mesh(leftPathGeo, pathMat);
+ leftPath.rotation.x = -Math.PI / 2;
+ leftPath.position.set(-60, 0.05, 0); 
+ leftPath.receiveShadow = true;
+ scene.add(leftPath);
+
+ const rightPathGeo = new THREE.PlaneGeometry(80, 8);
+ const rightPath = new THREE.Mesh(rightPathGeo, pathMat);
+ rightPath.rotation.x = -Math.PI / 2;
+ rightPath.position.set(60, 0.05, 0); 
+ rightPath.receiveShadow = true;
+ scene.add(rightPath);
+
+ const waterGeo = new THREE.PlaneGeometry(400, 400);
+ const water = new THREE.Mesh(waterGeo, waterMat);
+ water.rotation.x = -Math.PI / 2;
+ water.position.y = -20;
+ scene.add(water);
+
+ const bridgeGeo = new THREE.BoxGeometry(44, 0.8, 12);
+ const bridgeMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 }); 
+ const bridge = new THREE.Mesh(bridgeGeo, bridgeMat);
+ bridge.position.set(0, -0.2, 0); 
+ bridge.receiveShadow = true;
+ scene.add(bridge);
+
+ const handleMat = new THREE.MeshLambertMaterial({ color: 0x3E2723 }); 
+ const railGeo = new THREE.BoxGeometry(44, 0.8, 0.8);
+ const rail1 = new THREE.Mesh(railGeo, handleMat);
+ rail1.position.set(0, 1.5, 5.5); 
+ scene.add(rail1);
+ const rail2 = new THREE.Mesh(railGeo, handleMat);
+ rail2.position.set(0, 1.5, -5.5);
+ scene.add(rail2);
+ 
+ const postGeo = new THREE.BoxGeometry(0.8, 2, 0.8);
+ const postX = [-20, -10, 0, 10, 20];
+ const railZ = [5.5, -5.5];
+ postX.forEach(x => {
+ railZ.forEach(z => {
+ const post = new THREE.Mesh(postGeo, handleMat);
+ post.position.set(x, 0.5, z);
+ scene.add(post);
+ });
+ });
+ }
+
+ // --- ASSET GENERATION ---
+ function createShopkeeper(x, z) {
+ const group = new THREE.Group();
+ const monkey = createCharacterMesh(0x0000FF);
+ monkey.rotation.y = Math.PI / 2; 
+ group.add(monkey);
+ const standGeo = new THREE.BoxGeometry(3, 1.5, 2);
+ const standMat = new THREE.MeshLambertMaterial({ color: 0x8B4513 });
+ const stand = new THREE.Mesh(standGeo, standMat);
+ stand.position.set(1.5, 0.75, 0); stand.castShadow = true; 
+ group.add(stand);
+ const itemGeo = new THREE.BoxGeometry(0.8, 0.5, 0.5);
+ const itemMat = new THREE.MeshBasicMaterial({ color: 0xFFD700 });
+ const item = new THREE.Mesh(itemGeo, itemMat);
+ item.position.set(1.5, 1.75, 0); 
+ group.add(item);
+ group.position.set(x, 0, z);
+ scene.add(group);
+ return group;
+ }
+
+ function createCharacterMesh(colorHex) {
+ const container = new THREE.Group(); 
+ const meshGroup = new THREE.Group(); 
+ container.add(meshGroup); container.userData.visual = meshGroup; 
+ const bodyMaterial = new THREE.MeshLambertMaterial({ color: colorHex }); 
+ const faceMaterial = new THREE.MeshLambertMaterial({ color: 0xF4A460 }); 
+ const blackMaterial = new THREE.MeshBasicMaterial({ color: 0x000000 });
+ const bodyGeo = new THREE.SphereGeometry(0.9, 16, 16);
+ const body = new THREE.Mesh(bodyGeo, bodyMaterial);
+ body.scale.set(1, 1.3, 1); body.position.y = 1.3; body.castShadow = true; meshGroup.add(body);
+ const headGeo = new THREE.SphereGeometry(0.7, 16, 16);
+ const head = new THREE.Mesh(headGeo, bodyMaterial);
+ head.position.y = 2.6; head.castShadow = true; meshGroup.add(head);
+ const earGeo = new THREE.SphereGeometry(0.25, 16, 16);
+ const leftEar = new THREE.Mesh(earGeo, bodyMaterial);
+ leftEar.position.set(-0.65, 2.6, 0); meshGroup.add(leftEar);
+ const rightEar = new THREE.Mesh(earGeo, bodyMaterial);
+ rightEar.position.set(0.65, 2.6, 0); meshGroup.add(rightEar);
+ const snoutGeo = new THREE.SphereGeometry(0.35, 16, 16);
+ const snout = new THREE.Mesh(snoutGeo, faceMaterial);
+ snout.position.set(0, 2.5, 0.55); snout.scale.set(1, 0.8, 1); meshGroup.add(snout);
+ const eyeGeo = new THREE.SphereGeometry(0.05, 8, 8);
+ const leftEye = new THREE.Mesh(eyeGeo, blackMaterial);
+ leftEye.position.set(-0.15, 2.7, 0.65); meshGroup.add(leftEye);
+ const rightEye = new THREE.Mesh(eyeGeo, blackMaterial);
+ rightEye.position.set(0.15, 2.7, 0.65); meshGroup.add(rightEye);
+ return container;
+ }
+
+ function createPlatformerChallenge() {
+ let startX = 25; let startZ = 20; let startY = 2;
+ const platMat = new THREE.MeshLambertMaterial({ color: 0x32CD32 }); 
+ const platGeo = new THREE.CylinderGeometry(2.5, 2.5, 0.5, 16);
+ for(let i=0; i<15; i++) {
+ const angle = i * 0.8; const radius = 10 + (i * 0.5); 
+ const px = startX + Math.cos(angle) * radius;
+ const pz = startZ + Math.sin(angle) * radius;
+ const py = startY + (i * 2.5); 
+ const plat = new THREE.Mesh(platGeo, platMat);
+ plat.position.set(px, py, pz); plat.castShadow = true; plat.receiveShadow = true; scene.add(plat);
+ platforms.push({ mesh: plat, x: px, z: pz, y: py + 0.25, radius: 2.5 });
+ if (i === 14) createBlueGem(px, py + 1.5, pz);
+ }
+ }
+
+ function createBlueGem(x, y, z) {
+ const geo = new THREE.IcosahedronGeometry(1, 0);
+ const mat = new THREE.MeshPhongMaterial({ color: 0x0000FF, emissive: 0x00BFFF, shininess: 100, specular: 0xFFFFFF, transparent: true, opacity: 0.9 });
+ blueGem = new THREE.Mesh(geo, mat); blueGem.position.set(x, y, z); scene.add(blueGem);
+ const light = new THREE.PointLight(0x00BFFF, 1, 10); light.position.set(x, y, z); scene.add(light);
+ }
+
+ function generateVegetation() {
+ // Path Trees (Left) - Avoid Shopkeeper (-35, 8)
+ for(let x = -100; x <= -25; x += 6) {
+ if(Math.abs(x - (-35)) > 8) createTree(x + (Math.random()*2), 7 + Math.random()*3, 1.2 + Math.random()*0.5);
+ createTree(x + (Math.random()*2), -7 - Math.random()*3, 1.2 + Math.random()*0.5);
+ }
+ // Path Trees (Right)
+ for(let x = 25; x <= 100; x += 6) { 
+ createTree(x + (Math.random()*2), 7 + Math.random()*3, 1.2 + Math.random()*0.5);
+ createTree(x + (Math.random()*2), -7 - Math.random()*3, 1.2 + Math.random()*0.5);
+ }
+ // Wild Trees
+ for(let i=0; i<80; i++) { 
+ let pos = getMapPosition();
+ if (Math.abs(pos.z) > 15) createTree(pos.x, pos.z, 1.5 + Math.random());
+ }
+ // Plants
+ for(let i=0; i<60; i++) {
+ let pos = getMapPosition();
+ if (Math.abs(pos.z) > 5) {
+ const distToShop = Math.sqrt(Math.pow(pos.x - (-35), 2) + Math.pow(pos.z - 8, 2));
+ if (distToShop > 8) createPlant(pos.x, pos.z);
+ }
+ }
+ // Flowers
+ const colors = [0xFF0000, 0xFF69B4, 0xFFA500, 0xEE82EE, 0xFFFF00];
+ for(let i=0; i<50; i++) {
+ let pos = getMapPosition();
+ let col = colors[Math.floor(Math.random() * colors.length)];
+ if (Math.abs(pos.z) > 5) {
+ const distToShop = Math.sqrt(Math.pow(pos.x - (-35), 2) + Math.pow(pos.z - 8, 2));
+ if (distToShop > 8) createFlower(pos.x, pos.z, col);
+ }
+ }
+ }
+
+ function getMapPosition() {
+ const side = Math.random() > 0.5 ? 1 : -1;
+ const x = side * (25 + Math.random() * 75);
+ const z = (Math.random() - 0.5) * 180;
+ return { x, z };
+ }
+
+ function createTree(x, z, scale = 1) {
+ const trunkGeo = new THREE.CylinderGeometry(0.6*scale, 0.9*scale, 5*scale, 8);
+ const trunkMat = new THREE.MeshLambertMaterial({ color: 0x3E2723 });
+ const trunk = new THREE.Mesh(trunkGeo, trunkMat); trunk.position.set(x, 2.5*scale, z); scene.add(trunk);
+ const leavesGeo = new THREE.ConeGeometry(3.5*scale, 8*scale, 8);
+ const leavesMat = new THREE.MeshLambertMaterial({ color: 0x006400 });
+ const leaves = new THREE.Mesh(leavesGeo, leavesMat); leaves.position.set(x, 6*scale, z); scene.add(leaves);
+ }
+ function createPlant(x, z) {
+ const plantGroup = new THREE.Group();
+ const bushMat = new THREE.MeshLambertMaterial({ color: 0x228B22 });
+ for(let i=0; i<3; i++) {
+ const geo = new THREE.SphereGeometry(0.8, 8, 8);
+ const mesh = new THREE.Mesh(geo, bushMat); mesh.position.set((Math.random()-0.5), 0.5, (Math.random()-0.5)); plantGroup.add(mesh);
+ }
+ plantGroup.position.set(x, 0, z); scene.add(plantGroup);
+ }
+ function createFlower(x, z, color) {
+ const group = new THREE.Group();
+ const stemGeo = new THREE.CylinderGeometry(0.05, 0.05, 1, 6);
+ const stemMat = new THREE.MeshBasicMaterial({ color: 0x006400 });
+ const stem = new THREE.Mesh(stemGeo, stemMat); stem.position.y = 0.5; group.add(stem);
+ const headGeo = new THREE.DodecahedronGeometry(0.3);
+ const headMat = new THREE.MeshBasicMaterial({ color: color });
+ const head = new THREE.Mesh(headGeo, headMat); head.position.y = 1; group.add(head);
+ group.position.set(x, 0, z); scene.add(group);
+ }
+ function createBanana(x, z) {
+ const bananaGeo = new THREE.TorusGeometry(0.4, 0.12, 8, 16, 2.2); 
+ const bananaMat = new THREE.MeshLambertMaterial({ color: 0xFFD700 });
+ const banana = new THREE.Mesh(bananaGeo, bananaMat);
+ banana.position.set(x, 1, z); banana.rotation.x = Math.PI / 2; banana.rotation.z = Math.PI / 4;
+ const group = new THREE.Group();
+ group.add(banana); group.position.set(x, 1.5, z); banana.position.set(0, 0, 0); scene.add(group);
+ bananas.push({ mesh: group, active: true, x: x, z: z });
+ }
+ function createMagnetMesh(x, z) {
+ const geo = new THREE.OctahedronGeometry(0.8, 0);
+ const mat = new THREE.MeshPhongMaterial({ color: 0x00FFFF, shininess: 100, emissive: 0x0000FF, emissiveIntensity: 0.5 });
+ const mesh = new THREE.Mesh(geo, mat);
+ const group = new THREE.Group();
+ group.add(mesh); group.position.set(x, 2, z); scene.add(group);
+ magnets.push({ mesh: group, active: true });
+ }
+
+ // --- GAMEPLAY LOGIC ---
+ function spawnBananas() { for(let i=0; i < totalBananas; i++) { const pos = getMapPosition(); createBanana(pos.x, pos.z); } }
+ function spawnMagnets() { for(let i=0; i<2; i++) { const pos = getMapPosition(); createMagnetMesh(pos.x, pos.z); } }
+ function spawnEnemies() {
+ for(let i=0; i < 6; i++) {
+ const enemyMesh = createCharacterMesh(0xC41E3A); 
+ const side = Math.random() > 0.5 ? 1 : -1; const x = side * (25 + Math.random() * 50); const z = (Math.random() - 0.5) * 8; 
+ enemyMesh.position.set(x, 0, z); scene.add(enemyMesh);
+ enemies.push({ mesh: enemyMesh, active: true, speed: 0.04 + Math.random() * 0.03, isChasing: false, health: 5 });
+ }
+ for(let i=0; i < 8; i++) {
+ const enemyMesh = createCharacterMesh(0xC41E3A); 
+ let pos = getMapPosition(); while(Math.abs(pos.z) < 20) pos = getMapPosition();
+ enemyMesh.position.set(pos.x, 0, pos.z); scene.add(enemyMesh);
+ enemies.push({ mesh: enemyMesh, active: true, speed: 0.05 + Math.random() * 0.03, isChasing: false, health: 5 });
+ }
+ bananas.forEach(b => {
+ if(Math.random() < 0.3) {
+ const enemyMesh = createCharacterMesh(0xC41E3A); 
+ const angle = Math.random() * Math.PI * 2; const gx = b.x + Math.cos(angle) * 2; const gz = b.z + Math.sin(angle) * 2;
+ enemyMesh.position.set(gx, 0, gz); scene.add(enemyMesh);
+ enemies.push({ mesh: enemyMesh, active: true, speed: 0.06, isChasing: false, health: 5 });
+ }
+ });
+ }
+
+ function activateMagnet() {
+ isMagnetActive = true; document.getElementById('magnet-ui').style.display = 'block'; playMagnetSound();
+ if (magnetTimeout) clearTimeout(magnetTimeout);
+ magnetTimeout = setTimeout(() => { isMagnetActive = false; document.getElementById('magnet-ui').style.display = 'none'; }, magnetDuration);
+ }
+
+ function handleInteraction() {
+ if (isGameOver) return;
+ const dist = monkeyGroup.position.distanceTo(shopkeeperGroup.position);
+ if (isDialogueOpen) { closeDialogue(); return; }
+ if (isShopOpen) { closeShop(); return; }
+ if (dist < 6) {
+ if (isFirstShopVisit) openDialogue();
+ else openShop();
+ }
+ }
+ function openDialogue() {
+ isDialogueOpen = true;
+ document.getElementById('dialogue-box').style.display = 'flex';
+ document.getElementById('interaction-prompt').style.display = 'none';
+ }
+ function closeDialogue() {
+ isDialogueOpen = false;
+ document.getElementById('dialogue-box').style.display = 'none';
+ }
+ function proceedToShop() {
+ closeDialogue();
+ isFirstShopVisit = false;
+ openShop();
+ }
+ function openShop() {
+ isShopOpen = true;
+ updateShopUI();
+ document.getElementById('shop-screen').style.display = 'block';
+ document.getElementById('interaction-prompt').style.display = 'none';
+ }
+ function closeShop() {
+ isShopOpen = false;
+ document.getElementById('shop-screen').style.display = 'none';
+ }
+ function updateShopUI() {
+ document.getElementById('shop-currency').innerText = currency;
+ const checkBtn = (id, cost) => {
+ const btn = document.getElementById(id);
+ if (currency >= cost) {
+ btn.disabled = false;
+ btn.innerHTML = `Buy (${cost} B)`;
+ } else {
+ btn.disabled = true;
+ btn.innerHTML = `Need ${cost} B`;
+ }
+ };
+ checkBtn('btn-speed', 5);
+ checkBtn('btn-jump', 8);
+ checkBtn('btn-magnet', 10);
+ checkBtn('btn-ultimate', 13);
+ }
+ function buyUpgrade(type, cost) {
+ if (currency >= cost) {
+ currency -= cost;
+ if (type === 'speed') { playerSpeed *= 1.2; playTone(600, 'sine', 0.1, 0.1); } 
+ else if (type === 'jump') { jumpForce *= 1.15; playTone(700, 'square', 0.1, 0.1); } 
+ else if (type === 'magnet') { magnetDuration += 5000; playTone(400, 'sawtooth', 0.1, 0.2); } 
+ else if (type === 'ultimate') { activateUltimate(); }
+ createParticles(monkeyGroup.position.x, monkeyGroup.position.y + 2, monkeyGroup.position.z, 0x00FF00, 20); 
+ updateUI();
+ updateShopUI();
+ }
+ }
+ function updateUI() { document.getElementById('score').innerText = `Bananas: ${currency} | Collected: ${totalCollected}/${totalBananas}`; }
+
+ function createParticles(x, y, z, color, count) {
+ for(let i=0; i<count; i++) {
+ const geo = new THREE.BoxGeometry(0.3, 0.3, 0.3);
+ const mat = new THREE.MeshBasicMaterial({ color: color });
+ const mesh = new THREE.Mesh(geo, mat);
+ mesh.position.set(x, y, z);
+ const vx = (Math.random() - 0.5) * 0.4;
+ const vy = Math.random() * 0.4;
+ const vz = (Math.random() - 0.5) * 0.4;
+ scene.add(mesh);
+ particles.push({ mesh, vx, vy, vz, life: 1.0 });
+ }
+ }
+ function createPurpleShockwave(centerPos) {
+ const count = 60;
+ for(let i=0; i<count; i++) {
+ const geo = new THREE.BoxGeometry(0.5, 0.5, 0.5);
+ const mat = new THREE.MeshBasicMaterial({ color: 0x800080 }); 
+ const mesh = new THREE.Mesh(geo, mat);
+ mesh.position.copy(centerPos);
+ const angle = (i / count) * Math.PI * 2;
+ const speed = 0.5;
+ const vx = Math.cos(angle) * speed;
+ const vz = Math.sin(angle) * speed;
+ scene.add(mesh);
+ shockwaves.push({ mesh, vx, vz, life: 3.0 }); 
+ }
+ }
+ function updateParticles() {
+ for(let i = particles.length - 1; i >= 0; i--) {
+ const p = particles[i];
+ p.life -= 0.02; p.mesh.position.x += p.vx; p.mesh.position.y += p.vy; p.mesh.position.z += p.vz; p.vy -= 0.02; p.mesh.rotation.x += 0.1; p.mesh.rotation.y += 0.1; p.mesh.scale.setScalar(p.life);
+ if(p.life <= 0) { scene.remove(p.mesh); particles.splice(i, 1); }
+ }
+ for(let i = shockwaves.length - 1; i >= 0; i--) {
+ const s = shockwaves[i];
+ s.life -= 0.015; s.mesh.position.x += s.vx; s.mesh.position.z += s.vz; s.mesh.rotation.y += 0.1; s.mesh.scale.setScalar(s.life * 2); 
+ if(s.life <= 0) { scene.remove(s.mesh); shockwaves.splice(i, 1); }
+ }
+ }
+
+ function addCombo() {
+ comboMultiplier++;
+ const el = document.getElementById('combo-ui');
+ el.innerText = `COMBO x${comboMultiplier}!`;
+ el.style.transform = "scale(1.5)";
+ setTimeout(() => el.style.transform = "scale(1)", 100);
+ if (comboTimer) clearTimeout(comboTimer);
+ comboTimer = setTimeout(() => { comboMultiplier = 1; el.style.transform = "scale(0)"; }, COMBO_WINDOW);
+ }
+ function activateUltimate() {
+ closeShop();
+ isUltimateActive = true; isGrounded = false;
+ playTone(200, 'sawtooth', 0.5, 1.0); 
+ setTimeout(() => {
+ createPurpleShockwave(monkeyGroup.position);
+ playTone(100, 'square', 0.5, 0.5); 
+ setTimeout(() => {
+ let activeEnemies = enemies.filter(e => e.active);
+ if (activeEnemies.length === 0) { finishUltimate(); return; }
+ let killIndex = 0;
+ function killNext() {
+ if (killIndex >= activeEnemies.length) { setTimeout(finishUltimate, 1000); return; }
+ let enemy = activeEnemies[killIndex];
+ cinematicCameraTarget = enemy.mesh.position.clone();
+ setTimeout(() => {
+ if(enemy.active) { 
+ createParticles(enemy.mesh.position.x, enemy.mesh.position.y, enemy.mesh.position.z, 0xFF0000, 30); 
+ playEnemyDeathSound(); scene.remove(enemy.mesh); enemy.active = false; 
+ }
+ killIndex++;
+ ultimateSequenceTimeout = setTimeout(killNext, 1000); 
+ }, 500); 
+ }
+ killNext();
+ }, 1500); 
+ }, 1500); 
+ }
+ function finishUltimate() {
+ if (blueGem) {
+ cinematicCameraTarget = blueGem.position.clone();
+ if (gemBeacon) scene.remove(gemBeacon);
+ const geo = new THREE.CylinderGeometry(0.5, 0.5, 100, 8);
+ const mat = new THREE.MeshBasicMaterial({ color: 0x00BFFF, transparent: true, opacity: 0.5 });
+ gemBeacon = new THREE.Mesh(geo, mat);
+ gemBeacon.position.set(blueGem.position.x, 50, blueGem.position.z);
+ scene.add(gemBeacon);
+ if (beaconTimeout) clearTimeout(beaconTimeout);
+ beaconTimeout = setTimeout(() => { if(gemBeacon) scene.remove(gemBeacon); gemBeacon = null; }, 10000);
+ ultimateSequenceTimeout = setTimeout(() => { cinematicCameraTarget = null; isUltimateActive = false; }, 1500);
+ } else { cinematicCameraTarget = null; isUltimateActive = false; }
+ enemies = enemies.filter(e => e.active);
+ }
+
+ // --- WIN ANIMATION LOGIC ---
+ function handleWinAnimation() {
+ monkeyGroup.position.y += (15 - monkeyGroup.position.y) * 0.03;
+ monkeyGroup.position.y += Math.cos(Date.now() * 0.005) * 0.05;
+ if(blueGem) {
+ const time = Date.now() * 0.003; const radius = 4;
+ blueGem.position.x = monkeyGroup.position.x + Math.sin(time * 2) * radius; 
+ blueGem.position.z = monkeyGroup.position.z + Math.cos(time * 2) * radius;
+ blueGem.position.y = monkeyGroup.position.y + Math.cos(time * 3) * 1.5; 
+ blueGem.rotation.y += 0.1; blueGem.rotation.z += 0.05;
+ }
+ cameraAngle += 0.01;
+ }
+
+ function updatePlayer() {
+ if (isGameOver) return;
+ if (isUltimateActive) velocityY = 0.2; 
+ else if (!isGrounded) velocityY -= gravity;
+ monkeyGroup.position.y += velocityY;
+
+ let groundHeight = -100;
+ if (monkeyGroup.position.x > -140 && monkeyGroup.position.x < -20 && Math.abs(monkeyGroup.position.z) < 120) groundHeight = 0;
+ else if (monkeyGroup.position.x > 20 && monkeyGroup.position.x < 140 && Math.abs(monkeyGroup.position.z) < 120) groundHeight = 0;
+ else if (monkeyGroup.position.x > -22 && monkeyGroup.position.x < 22 && Math.abs(monkeyGroup.position.z) < 6) groundHeight = 0.2;
+
+ platforms.forEach(p => {
+ const dist = Math.sqrt(Math.pow(monkeyGroup.position.x - p.x, 2) + Math.pow(monkeyGroup.position.z - p.z, 2));
+ if (dist < p.radius + 0.8) { 
+ if (monkeyGroup.position.y >= p.y - 1.5 && velocityY <= 0) if(p.y > groundHeight) groundHeight = p.y;
+ }
+ });
+
+ if (!isUltimateActive) {
+ if (monkeyGroup.position.y <= groundHeight) {
+ monkeyGroup.position.y = groundHeight;
+ velocityY = 0;
+ isGrounded = true;
+ } else {
+ isGrounded = false;
+ }
+ }
+
+ if (monkeyGroup.position.y < -5) { gameOver("You fell into the water!"); return; }
+ if (isShopOpen || isDialogueOpen) return;
+
+ const speed = playerSpeed;
+ let moveX = 0;
+ let moveZ = 0;
+ const forward = new THREE.Vector3(Math.sin(cameraAngle), 0, Math.cos(cameraAngle)).normalize();
+ const right = new THREE.Vector3(Math.sin(cameraAngle - Math.PI/2), 0, Math.cos(cameraAngle - Math.PI/2)).normalize();
+
+ if (keys['w'] || keys['arrowup']) { moveX -= forward.x * speed; moveZ -= forward.z * speed; }
+ if (keys['s'] || keys['arrowdown']) { moveX += forward.x * speed; moveZ += forward.z * speed; }
+ if (keys['a']) { moveX += right.x * speed; moveZ += right.z * speed; }
+ if (keys['d']) { moveX -= right.x * speed; moveZ -= right.z * speed; }
+ if (keys['arrowleft']) cameraAngle += 0.05; 
+ if (keys['arrowright']) cameraAngle -= 0.05; 
+
+ monkeyGroup.position.x += moveX;
+ monkeyGroup.position.z += moveZ;
+
+ if (moveX !== 0 || moveZ !== 0) {
+ const targetRotation = Math.atan2(moveX, moveZ);
+ let rotDiff = targetRotation - monkeyGroup.rotation.y;
+ while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+ while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+ monkeyGroup.rotation.y += rotDiff * 0.2;
+ if(isGrounded && monkeyGroup.userData.visual) monkeyGroup.userData.visual.position.y = Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
+ } else {
+ if(isGrounded && monkeyGroup.userData.visual) monkeyGroup.userData.visual.position.y = 0;
+ }
+ 
+ const dist = monkeyGroup.position.distanceTo(shopkeeperGroup.position);
+ const promptEl = document.getElementById('interaction-prompt');
+ if (dist < 6 && !isShopOpen && !isDialogueOpen) promptEl.style.display = 'block';
+ else promptEl.style.display = 'none';
+ }
+
+ function updateEnemies() {
+ enemies.forEach(enemy => {
+ if (!enemy.active) return;
+ const dx = monkeyGroup.position.x - enemy.mesh.position.x;
+ const dz = monkeyGroup.position.z - enemy.mesh.position.z;
+ const dist = Math.sqrt(dx*dx + dz*dz);
+ if (dist < 25.0) enemy.isChasing = true;
+ if((enemy.isChasing) && dist > 1.5 && monkeyGroup.position.y < 2) { 
+ let nextX = enemy.mesh.position.x + (dx / dist) * enemy.speed;
+ let nextZ = enemy.mesh.position.z + (dz / dist) * enemy.speed;
+ if (nextX > -20 && nextX < 20 && (nextZ < -6 || nextZ > 6)) { } else { enemy.mesh.position.x = nextX; enemy.mesh.position.z = nextZ; }
+ enemy.mesh.rotation.y = Math.atan2(dx, dz);
+ enemy.mesh.position.y = Math.abs(Math.sin(Date.now() * 0.015)) * 0.2;
+ } else enemy.mesh.position.y = 0;
+ if (dist < 2.0 && monkeyGroup.position.y < 3 && !isUltimateActive) gameOver("The bad monkeys caught you!");
+ });
+ }
+
+ function updateMagnetEffect() {
+ magnets.forEach(m => { if(m.active) { m.mesh.rotation.y += 0.05; m.mesh.position.y = 2 + Math.sin(Date.now() * 0.005) * 0.5; } });
+ if (isMagnetActive) {
+ bananas.forEach(b => {
+ if (b.active) {
+ const dx = monkeyGroup.position.x - b.mesh.position.x;
+ const dz = monkeyGroup.position.z - b.mesh.position.z;
+ const dist = Math.sqrt(dx*dx + dz*dz);
+ if (dist > 1.0) { b.mesh.position.x += (dx / dist) * 0.5; b.mesh.position.z += (dz / dist) * 0.5; b.mesh.rotation.x += 0.2; b.mesh.rotation.y += 0.2; }
+ }
+ });
+ }
+ }
+
+ function performAttack() {
+ if (isAttackOnCooldown) return;
+ isAttackOnCooldown = true;
+ setTimeout(() => { isAttackOnCooldown = false; }, 1000);
+ playAttackSound();
+ const attackRange = 6.0;
+ enemies.forEach(enemy => {
+ if(!enemy.active) return;
+ const dist = monkeyGroup.position.distanceTo(enemy.mesh.position);
+ if (dist < attackRange) {
+ enemy.health -= 1;
+ createParticles(enemy.mesh.position.x, enemy.mesh.position.y + 1, enemy.mesh.position.z, 0xFFA500, 5);
+ playTone(300, 'square', 0.1, 0.1);
+ const pushDir = enemy.mesh.position.clone().sub(monkeyGroup.position).normalize();
+ enemy.mesh.position.add(pushDir.multiplyScalar(2));
+ if (enemy.health <= 0) {
+ playEnemyDeathSound();
+ scene.remove(enemy.mesh);
+ enemy.active = false;
+ createParticles(enemy.mesh.position.x, enemy.mesh.position.y+1, enemy.mesh.position.z, 0xC41E3A, 20);
+ }
+ }
+ });
+ }
+
+ function checkCollisions() {
+ if (isFalling) return;
+ const playerPos = monkeyGroup.position; const collectDist = 2.5;
+ bananas.forEach(b => {
+ if (b.active) {
+ const dist = playerPos.distanceTo(b.mesh.position);
+ if (dist < collectDist) {
+ scene.remove(b.mesh); b.active = false; addCombo();
+ const amount = 1 * comboMultiplier; currency += amount; totalCollected++;
+ updateUI(); playCollectSound(); createParticles(b.mesh.position.x, b.mesh.position.y, b.mesh.position.z, 0xFFD700, 8);
+ if (totalCollected >= totalBananas) gameWin("You collected all the bananas!");
+ } b.mesh.rotation.y += 0.05;
+ }
+ });
+ magnets.forEach(m => {
+ if (m.active) {
+ const dist = playerPos.distanceTo(m.mesh.position);
+ if (dist < collectDist) {
+ scene.remove(m.mesh); m.active = false; activateMagnet();
+ createParticles(m.mesh.position.x, m.mesh.position.y, m.mesh.position.z, 0x00FFFF, 10);
+ }
+ }
+ });
+ if(blueGem) {
+ const dist = playerPos.distanceTo(blueGem.position);
+ if(dist < 3.0) {
+ isGemCollected = true; 
+ gameWin("You found the Blue Gem!");
+ } else {
+ if (!isGemCollected) blueGem.rotation.y += 0.02;
+ }
+ }
+ }
+
+ function updateCamera() {
+ if (cinematicCameraTarget) {
+ camera.position.x = cinematicCameraTarget.x + 8;
+ camera.position.y = cinematicCameraTarget.y + 8;
+ camera.position.z = cinematicCameraTarget.z + 8;
+ camera.lookAt(cinematicCameraTarget.x, cinematicCameraTarget.y, cinematicCameraTarget.z);
+ } else {
+ camera.position.x = monkeyGroup.position.x + Math.sin(cameraAngle) * cameraDistance;
+ camera.position.z = monkeyGroup.position.z + Math.cos(cameraAngle) * cameraDistance;
+ camera.position.y = monkeyGroup.position.y + cameraHeight;
+ camera.lookAt(monkeyGroup.position.x, monkeyGroup.position.y + 2, monkeyGroup.position.z);
+ }
+ }
+
+ // --- AUDIO & UTIL ---
+ function initAudio() { if (!audioCtx) { audioCtx = new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === 'suspended') audioCtx.resume(); } }
+ function startTropicalMusic() { if (isMusicPlaying) return; isMusicPlaying = true; const scale = [261.63, 329.63, 392.00, 440.00, 523.25, 392.00, 329.63, 293.66]; let noteIndex = 0; const tempo = 250; musicInterval = setInterval(() => { if (isGameOver && !isGemCollected) { clearInterval(musicInterval); isMusicPlaying = false; return; } playTone(scale[noteIndex % scale.length], 'sine', 0.1, 0.3); if (noteIndex % 4 === 0) playTone(130.81, 'triangle', 0.1, 0.4); else if (noteIndex % 4 === 2) playTone(196.00, 'triangle', 0.05, 0.4); noteIndex++; }, tempo); }
+ function playTone(freq, type, vol, duration) { if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.type = type; osc.frequency.setValueAtTime(freq, audioCtx.currentTime); gainNode.gain.setValueAtTime(vol, audioCtx.currentTime); gainNode.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + duration); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + duration); }
+ function playCollectSound() { const baseFreq = 880 + (comboMultiplier * 100); playTone(baseFreq, 'sine', 0.1, 0.1); setTimeout(() => playTone(baseFreq * 2, 'sine', 0.1, 0.1), 50); }
+ function playMagnetSound() { playTone(440, 'square', 0.1, 0.2); setTimeout(() => playTone(554, 'square', 0.1, 0.2), 100); setTimeout(() => playTone(659, 'square', 0.1, 0.4), 200); }
+ function playAttackSound() { if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.type = 'triangle'; osc.frequency.setValueAtTime(400, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(100, audioCtx.currentTime + 0.15); gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.15); osc.start(); osc.stop(audioCtx.currentTime + 0.15); }
+ function playEnemyDeathSound() { if (!audioCtx) return; const osc = audioCtx.createOscillator(); const gainNode = audioCtx.createGain(); osc.connect(gainNode); gainNode.connect(audioCtx.destination); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioCtx.currentTime); osc.frequency.linearRampToValueAtTime(50, audioCtx.currentTime + 0.2); gainNode.gain.setValueAtTime(0.1, audioCtx.currentTime); gainNode.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.2); osc.start(); osc.stop(audioCtx.currentTime + 0.2); }
+ function playMonkeySound() { if (!audioCtx) return; setTimeout(() => playTone(300, 'sawtooth', 0.2, 0.15), 0); setTimeout(() => playTone(300, 'sawtooth', 0.2, 0.15), 200); setTimeout(() => playTone(600, 'square', 0.2, 0.15), 400); setTimeout(() => playTone(600, 'square', 0.2, 0.15), 600); setTimeout(() => { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(500, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.5); gain.gain.setValueAtTime(0.2, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.5); }, 800); }
+ function speak(text) { const msg = new SpeechSynthesisUtterance(text); const bestVoice = voices.find(v => v.name.includes('Google US English')) || voices.find(v => v.name.includes('Natural')) || voices.find(v => v.lang === 'en-US'); if (bestVoice) msg.voice = bestVoice; msg.pitch = 1.0; msg.rate = 1.0; window.speechSynthesis.speak(msg); }
+ function gameWin(message) { isGameOver = true; document.querySelector('#win-screen p').innerText = message; document.getElementById('win-screen').style.display = 'block'; speak("You Win! " + message); /* don't clear music yet for animation */ }
+ function gameOver(reason) { if(isGameOver) return; isGameOver = true; document.querySelector('#lose-screen p').innerText = reason; document.getElementById('lose-screen').style.display = 'block'; playMonkeySound(); clearInterval(musicInterval); }
+ function restartGame() {
+ if(ultimateSequenceTimeout) clearTimeout(ultimateSequenceTimeout);
+ cinematicCameraTarget = null;
+ isGameOver = false; isFalling = false; isMagnetActive = false; isShopOpen = false; isDialogueOpen = false; isUltimateActive = false; isAttackOnCooldown = false; isFirstShopVisit = true; isGemCollected = false;
+ if(gemBeacon) scene.remove(gemBeacon); gemBeacon = null;
+ document.getElementById('magnet-ui').style.display = 'none'; document.getElementById('shop-screen').style.display = 'none'; document.getElementById('dialogue-box').style.display = 'none';
+ currency = 0; totalCollected = 0; playerSpeed = 0.2; jumpForce = 0.4; magnetDuration = 5000; velocityY = 0;
+ updateUI();
+ document.getElementById('win-screen').style.display = 'none'; document.getElementById('lose-screen').style.display = 'none';
+ monkeyGroup.position.set(-40,0,0); monkeyGroup.rotation.set(0,0,0); cameraAngle = 0;
+ bananas.forEach(b => { if(b.active) scene.remove(b.mesh); });
+ enemies.forEach(e => { if(e.active) scene.remove(e.mesh); });
+ magnets.forEach(m => { if(m.active) scene.remove(m.mesh); });
+ particles.forEach(p => scene.remove(p.mesh)); particles = [];
+ shockwaves.forEach(s => scene.remove(s.mesh)); shockwaves = [];
+ if(blueGem) scene.remove(blueGem);
+ platforms.forEach(p => scene.remove(p.mesh)); platforms = [];
+ bananas = []; enemies = []; magnets = [];
+ spawnBananas(); spawnEnemies(); spawnMagnets(); createPlatformerChallenge();
+ isMusicPlaying = false; startTropicalMusic();
+ }
+ function onWindowResize() { camera.aspect = window.innerWidth / window.innerHeight; camera.updateProjectionMatrix(); renderer.setSize(window.innerWidth, window.innerHeight); }
+ function animate() { 
+ requestAnimationFrame(animate); 
+ 
+ if (isGemCollected) {
+ handleWinAnimation();
+ updateParticles(); 
+ } else if (!isGameOver) { 
+ updatePlayer(); updateEnemies(); checkCollisions(); updateMagnetEffect(); updateParticles(); 
+ } 
+ 
+ updateCamera(); 
+ renderer.render(scene, camera); 
+ }
+ </script>
+</body>
+</html>
